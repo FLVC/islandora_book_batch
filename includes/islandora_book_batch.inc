@@ -23,10 +23,13 @@ class IslandoraBookBatch extends IslandoraScanBatch {
    */
   protected function groupFiles($listing) {
     $files = array();
-
     foreach ($listing as $relative_uri => $file_info) {
       $dir_name = dirname($relative_uri);
       $components = explode(DIRECTORY_SEPARATOR, $dir_name);
+      if (isset($components[1]) && !is_numeric($components[1])) {
+        // Check that the page numbers are numeric.
+        throw new Exception('Bad Batch. Page numbers must be numeric, ensure the page directories only contain numeric values. Refer to the module read me https://github.com/Islandora/islandora_book_batch/blob/7.x/README.md');
+      }
       $this->reGroup($files, $components, $relative_uri, $file_info);
     }
 
@@ -41,7 +44,6 @@ class IslandoraBookBatch extends IslandoraScanBatch {
           $no_metadata[$key] = $key;
         }
       }
-
       $files = array_diff_key($files, $no_metadata);
     }
 
@@ -60,14 +62,12 @@ class IslandoraBookBatch extends IslandoraScanBatch {
       foreach ($q->execute() as $result) {
         // Grab the relative path of the book resource entry.
         $relative_path = substr($result->resource, $target_length + 1);
-
         // Unset the entry from the array, if it exists.
         if (isset($files[$relative_path])) {
           unset($files[$relative_path]);
         }
       }
     }
-
     return $files;
   }
 
@@ -349,7 +349,7 @@ EOXML;
         $s_xml = new SimpleXMLElement($xml);
         if ($s_xml->getName() == 'dc') {
           // XXX: Should probably create a resource entry.
-          $dc_datastream->setContentFromFile($meta->uri, FALSE);
+          $datastream->setContentFromFile($meta->uri, FALSE);
         }
       }
     }
@@ -402,9 +402,13 @@ class IslandoraBookBookBatchObject extends IslandoraFlatBatchObject {
   public function addRelationships() {
     parent::addRelationships();
     module_load_include('inc', 'islandora_paged_content', 'includes/derivatives');
+    module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
 
     if (isset($this->preprocessorParameters['create_pdfs']) && $this->preprocessorParameters['create_pdfs']) {
       islandora_paged_content_set_pdf_flag($this);
+    }
+    if (isset($this->preprocessorParameters['page_progression']) && $this->preprocessorParameters['page_progression']) {
+      islandora_paged_content_set_page_progression($this, $this->preprocessorParameters['page_progression']);
     }
     // Identify the source of this object.
     $this->relationships->add(ISLANDORA_RELS_EXT_URI, 'book-batched', 'true', RELS_TYPE_PLAIN_LITERAL);
@@ -469,10 +473,8 @@ class IslandoraBookPageBatchObject extends IslandoraFlatBatchObject {
     // Add content model relationship.
     $this->models = 'islandora:pageCModel';
     if (isset($this->preprocessorParameters['generate_ocr'])) {
-      if ($this->preprocessorParameters['generate_ocr'] == TRUE) {
-        module_load_include('inc', 'islandora_ocr', 'includes/derivatives');
-        islandora_ocr_set_generate_ocr_rels_ext_statement($this);
-      }
+      module_load_include('inc', 'islandora_ocr', 'includes/derivatives');
+      islandora_ocr_set_generate_ocr_rels_ext_statement($this, $this->preprocessorParameters['generate_ocr']);
     }
   }
 }
