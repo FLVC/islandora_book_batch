@@ -168,7 +168,7 @@ class IslandoraFlatBatchObject extends IslandoraScanBatchObject {
   protected function getMods() {
     if (!isset($this['MODS'])) {
       $mods_datastream = $this->constructDatastream('MODS', 'X');
-      $mods_datastream->mimetype = 'text/xml';
+      $mods_datastream->mimetype = 'application/xml';
       $mods_datastream->label = 'MODS Record';
 
       $dir = drupal_get_path('module', 'islandora_batch');
@@ -228,7 +228,7 @@ EOXML;
           $datastream->setContentFromFile($meta->uri, FALSE);
         }
         // MARCXML, transform to MODS and set.
-        elseif ($s_xml->getName() == 'record') {
+        elseif (in_array($s_xml->getName(), array('record', 'collection'))) {
           $datastream->content = static::runXslTransform(array(
             'input' => $xml,
             'xsl' => $dir . '/transforms/MARC21slim2MODS3-4.xsl',
@@ -299,7 +299,7 @@ EOXML;
     if (!isset($this['DC'])) {
       // Create the DC datastream on this object.
       $dc_datastream = $this->constructDatastream('DC', 'X');
-      $dc_datastream->mimetype = 'text/xml';
+      $dc_datastream->mimetype = 'application/xml';
       $dc_datastream->label = 'DC Record';
 
       if (isset($this->objectInfo['.']['DC'])) {
@@ -406,6 +406,9 @@ class IslandoraBookBookBatchObject extends IslandoraFlatBatchObject {
 
     if (isset($this->preprocessorParameters['create_pdfs']) && $this->preprocessorParameters['create_pdfs']) {
       islandora_paged_content_set_pdf_flag($this);
+    }
+    if (isset($this->preprocessorParameters['aggregate_ocr']) && $this->preprocessorParameters['aggregate_ocr']) {
+      islandora_paged_content_set_ocr_flag($this);
     }
     if (isset($this->preprocessorParameters['page_progression']) && $this->preprocessorParameters['page_progression']) {
       islandora_paged_content_set_page_progression($this, $this->preprocessorParameters['page_progression']);
