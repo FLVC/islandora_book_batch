@@ -22,10 +22,6 @@ function islandora_book_batch_drush_command() {
         'description' => 'Either "directory" or "zip".',
         'required' => TRUE,
       ),
-      'target' => array(
-        'description' => 'The target to directory or zip file to scan.',
-        'required' => TRUE,
-      ),
       'namespace' => array(
         'description' => 'The namespace for objects created by this command.  Defaults to namespce set in fedora config.',
         'required' => FALSE,
@@ -61,6 +57,10 @@ function islandora_book_batch_drush_command() {
         'description' => 'A flag to allow for conditional OCR generation.',
         'value' => 'optional',
       ),
+      'aggregate_ocr' => array(
+        'description' => 'A flag to cause OCR to be aggregated to books, if OCR is also being generated per-page.',
+        'value' => 'optional',
+      ),
       'email_admin' => array(
         'description' => 'A flag to notify the site admin when the book is ' .
         'fully ingested (depends on Rules being enabled).',
@@ -80,10 +80,29 @@ function islandora_book_batch_drush_command() {
         'description' => 'A flag to indicate the page progression for the book. If not specified will default to LR.',
         'value' => 'optional',
       ),
+      'output_set_id' => array(
+        'description' => 'A flag to indicate whether to print the set ID of the preprocessed book.',
+        'value' => 'optional',
+      ),
     ),
     'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
   );
-
+  // XXX: The target parameter became reserved in Drush 7 and above, for
+  // backwards compatibility both will be supported. Not using
+  // strict-option-handling (http://www.drush.org/en/master/strict-options) as
+  // it requires manual argument parsing.
+  if (DRUSH_VERSION >= 7) {
+    $items['islandora_book_batch_preprocess']['options']['scan_target'] = array(
+      'description' => 'The target to directory or zip file to scan.',
+      'required' => TRUE,
+    );
+  }
+  else {
+    $items['islandora_book_batch_preprocess']['options']['target'] = array(
+      'description' => 'The target to directory or zip file to scan.',
+      'required' => TRUE,
+    );
+  }
   return $items;
 }
 
@@ -100,11 +119,12 @@ function drush_islandora_book_batch_preprocess() {
   $parameters = array(
     'type' => drush_get_option('type'),
     'namespace' => drush_get_option('namespace'),
-    'target' => drush_get_option('target'),
+    'target' => DRUSH_VERSION >= 7 ? drush_get_option('scan_target') : drush_get_option('target'),
     'parent' => drush_get_option('parent', 'islandora:bookCollection'),
     'parent_relationship_uri' => drush_get_option('parent_relationship_uri', 'info:fedora/fedora-system:def/relations-external#'),
     'parent_relationship_pred' => drush_get_option('parent_relationship_pred', 'isMemberOfCollection'),
     'create_pdfs' => drush_get_option('create_pdfs', FALSE),
+    'aggregate_ocr' => drush_get_option('aggregate_ocr', FALSE),
     'email_admin' => drush_get_option('email_admin', FALSE),
     'wait_for_metadata' => drush_get_option('wait_for_metadata', FALSE),
     'directory_dedup' => drush_get_option('directory_dedup', FALSE),
@@ -129,6 +149,10 @@ function drush_islandora_book_batch_preprocess() {
 
   // Pass the preprocessor off to run.
   $preprocessed = islandora_batch_handle_preprocessor($preprocessor);
+
+  if (drush_get_option('output_set_id', FALSE)) {
+    drush_print($preprocessor->getSetId());
+  }
 }
 
 /**
